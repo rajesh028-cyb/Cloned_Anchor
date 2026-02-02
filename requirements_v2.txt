@@ -1,0 +1,58 @@
+# Real-Time Voice AI Agent - Requirements (Optimized)
+# ===================================================
+# Install: pip install -r requirements_v2.txt
+
+# Core Audio
+pyaudio>=0.2.13                # Audio I/O (primary)
+sounddevice>=0.4.6             # Audio I/O (fallback)
+numpy>=1.24.0                  # Fast array operations
+
+# VAD - Silero (CPU optimized)
+torch>=2.0.0                   # PyTorch (CPU)
+torchaudio>=2.0.0              # Audio processing
+silero-vad>=5.0                # Silero VAD model
+
+# ASR - faster-whisper (RECOMMENDED for speed)
+faster-whisper>=0.10.0         # INT8 quantized Whisper
+# openai-whisper>=20231117     # Fallback (slower)
+
+# LLM - llama-cpp (streaming)
+llama-cpp-python>=0.2.0        # Local LLM with streaming
+requests>=2.31.0               # For Ollama API calls
+# ollama                       # Alternative (server-based)
+
+# TTS - Coqui (streaming)
+TTS>=0.22.0                    # Coqui TTS (streaming)
+pyttsx3>=2.90                  # Fallback (offline)
+
+# Utilities
+scipy>=1.11.0                  # Resampling
+regex>=2023.0.0                # Advanced regex for pattern matching
+# wave                         # WAV file handling (stdlib)
+
+# Optional: Monitoring
+psutil>=5.9.0                  # System monitoring
+
+# ===================================================
+# INSTALLATION NOTES:
+# ===================================================
+#
+# Windows (with conda):
+#   conda install pyaudio
+#   pip install -r requirements.txt
+#
+# Linux:
+#   sudo apt install portaudio19-dev
+#   pip install -r requirements.txt
+#
+# macOS:
+#   brew install portaudio
+#   pip install -r requirements.txt
+#
+# For GPU acceleration (optional):
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+#
+# For faster-whisper with CUDA:
+#   pip install faster-whisper[cuda]
+#
+# ===================================================
