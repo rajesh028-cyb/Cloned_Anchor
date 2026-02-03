@@ -106,10 +106,9 @@ class TemplateBasedLLM:
             # Warmup
             self.model("Hello", max_tokens=1)
             
-            print("[LLM] llama-cpp loaded with streaming")
             return
         except Exception as e:
-            print(f"[LLM] llama-cpp not available: {e}")
+            pass
         
         # Try Ollama
         try:
@@ -118,12 +117,10 @@ class TemplateBasedLLM:
             if resp.status_code == 200:
                 self.backend = "ollama"
                 self.ollama_model = "phi"
-                print(f"[LLM] Ollama ({self.ollama_model})")
                 return
         except:
             pass
         
-        print("[LLM] Template-only mode (fastest)")
         self.backend = "template-only"
     
     def generate_response(
@@ -154,9 +151,6 @@ class TemplateBasedLLM:
             response = self._generate_with_llm(state, template, fills, context)
         
         response = self._sanitize(response)
-        
-        elapsed_ms = (time.time() - start_time) * 1000
-        print(f"[LLM] {elapsed_ms:.0f}ms: '{response}'")
         
         return response
     
@@ -298,7 +292,6 @@ Reply with ONLY the word/phrase (1-3 words max):"""
                 self.on_token(StreamingToken(text="", is_final=True))
                 
         except Exception as e:
-            print(f"[LLM] Stream error: {e}")
             yield self._sanitize(self._fill_template(template, fills))
     
     def _generate_ollama(self, prompt: str, max_tokens: int) -> str:

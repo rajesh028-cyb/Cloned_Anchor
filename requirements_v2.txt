@@ -16,8 +16,7 @@ silero-vad>=5.0                # Silero VAD model
 faster-whisper>=0.10.0         # INT8 quantized Whisper
 # openai-whisper>=20231117     # Fallback (slower)
 
-# LLM - llama-cpp (streaming)
-llama-cpp-python>=0.2.0        # Local LLM with streaming
+# LLM - llama-cpp (streaming)      # Local LLM with streaming
 requests>=2.31.0               # For Ollama API calls
 # ollama                       # Alternative (server-based)
 

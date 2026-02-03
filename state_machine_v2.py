@@ -107,9 +107,6 @@ class DeterministicStateMachine:
         
         # Jailbreak attempt counter
         self.jailbreak_attempts = 0
-        
-        print(f"[STATE] Initialized with {len(self._jailbreak_patterns)} JAILBREAK patterns, "
-              f"{len(self._extract_patterns)} EXTRACT patterns")
     
     def reset(self):
         """Reset for new conversation"""
@@ -149,7 +146,6 @@ class DeterministicStateMachine:
         
         if is_jailbreak:
             self.jailbreak_attempts += 1
-            print(f"[STATE] 🛡️ JAILBREAK BLOCKED - Pattern: '{jailbreak_match}'")
             
             analysis = {
                 "jailbreak_attempt": True,
@@ -172,7 +168,6 @@ class DeterministicStateMachine:
         
         if force_extract:
             self.context.forced_extract_count += 1
-            print(f"[STATE] ⚠️ FORCED EXTRACT - Pattern: '{matched}'")
             
             analysis = {
                 "jailbreak_attempt": False,
@@ -201,9 +196,6 @@ class DeterministicStateMachine:
         # ═══════════════════════════════════════════════════════════════════
         state = self._determine_state(analysis)
         self._update_context(analysis, state)
-        
-        elapsed_ms = (time.time() - start_time) * 1000
-        print(f"[STATE] {self.context.last_state} -> {state} ({elapsed_ms:.1f}ms)")
         
         return state, analysis
     
