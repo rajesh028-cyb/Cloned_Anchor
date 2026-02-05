@@ -8,7 +8,7 @@ regex>=2023.0.0                # Advanced regex for pattern matching
 
 # Optional: LLM backends (uncomment one if needed)
 # llama-cpp-python>=0.2.0      # Local LLM
-# requests>=2.31.0             # For Ollama API calls
+requests>=2.31.0             # For Ollama API calls
 
 # Optional: API Server
 flask>=3.0.0                   # HTTP API server

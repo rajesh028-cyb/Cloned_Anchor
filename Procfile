@@ -1,1 +1,1 @@
-web: gunicorn -w 2 -b 0.0.0.0:$PORT anchor_api_server:app
+web: gunicorn anchor_api_server:app --bind 0.0.0.0:$PORT
