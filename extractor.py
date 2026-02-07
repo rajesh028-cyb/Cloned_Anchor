@@ -124,6 +124,29 @@ class ArtifactExtractor:
             'bit.ly', 'tinyurl.com', 'goo.gl', 't.co',  # Shorteners
             'paytm.link', 'gpay.link',  # Fake payment
         }
+
+        # Suspicious scam-related keywords for extraction
+        self._suspicious_keywords = [
+            # Urgency
+            "urgent", "immediately", "hurry", "deadline", "expire",
+            # Authority / threat
+            "officer", "police", "arrest", "warrant", "court", "legal",
+            "penalty", "fraud", "illegal", "lawsuit",
+            # Account / banking
+            "account", "bank", "upi", "transfer", "payment", "wire",
+            "blocked", "suspended", "restricted", "locked", "compromised",
+            "unauthorized", "hacked", "terminated",
+            # Financial lures
+            "refund", "prize", "lottery", "winner", "reward",
+            # Credentials
+            "verify", "confirm", "password", "otp", "pin", "ssn",
+            # Tech scam
+            "virus", "malware", "infected", "secure",
+            # Action
+            "click", "download", "install",
+            # Payment methods
+            "bitcoin", "crypto", "gift card",
+        ]
     
     def extract(self, text: str) -> ExtractedArtifacts:
         """
@@ -156,7 +179,15 @@ class ArtifactExtractor:
         artifacts.emails = self._extract_emails(text, exclude=artifacts.upi_ids)
         
         return artifacts
-    
+
+    def extract_suspicious_keywords(self, text: str) -> List[str]:
+        """
+        Extract suspicious scam-related keywords from text.
+        Returns lowercase, deduplicated list of matched keywords.
+        """
+        text_lower = text.lower()
+        return [kw for kw in self._suspicious_keywords if kw in text_lower]
+
     def _extract_upi(self, text: str) -> List[str]:
         """Extract UPI IDs"""
         upi_ids = set()

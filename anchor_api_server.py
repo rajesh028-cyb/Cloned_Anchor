@@ -55,8 +55,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-# Track sessions that have already sent final callback (persists across requests)
-_completed_sessions = set()
+# Track sessions: session_id -> intel_count at last callback
+_session_last_intel = {}
 
 # GUVI Final Result Endpoint
 GUVI_FINAL_RESULT_URL = "https://hackathon.guvi.in/api/updateHoneyPotFinalResult"
@@ -107,7 +107,7 @@ def count_scammer_turns(conversation_history: list) -> int:
     return sum(1 for msg in conversation_history if msg.get("sender", "").lower() == "scammer")
 
 
-def send_final_callback(session_id: str, agent):
+def send_final_callback(session_id: str, agent, scam_detected: bool, suspicious_keywords: list):
     """
     Submit final intelligence to GUVI endpoint.
     Called when intelligence is extracted and turns >= 8.
@@ -121,12 +121,12 @@ def send_final_callback(session_id: str, agent):
             "upiIds": artifacts.get("upi_ids", []),
             "phishingLinks": artifacts.get("phishing_links", []),
             "phoneNumbers": artifacts.get("phone_numbers", []),
-            "suspiciousKeywords": []
+            "suspiciousKeywords": suspicious_keywords
         }
         
         payload = {
             "sessionId": session_id,
-            "scamDetected": True,
+            "scamDetected": scam_detected,
             "totalMessagesExchanged": total_turns,
             "extractedIntelligence": intelligence,
             "agentNotes": "Autonomous engagement completed. Intelligence extracted via deception."
@@ -225,17 +225,35 @@ if FLASK_AVAILABLE:
             artifacts = agent.memory.get_all_artifacts()
             turns = agent.memory.metrics.scammer_turns
             
-            # Check callback condition
-            has_intel = any([
-                artifacts.get("upi_ids"),
-                artifacts.get("bank_accounts"),
-                artifacts.get("phishing_links"),
-                artifacts.get("phone_numbers"),
-            ])
+            # ── Scam Detection + Keyword Extraction (all scammer messages) ──
+            scammer_texts = [
+                msg.get("text", "") for msg in conversation_history
+                if msg.get("sender", "").lower() == "scammer"
+            ]
+            scammer_texts.append(message_text)
             
-            if has_intel and turns >= 8 and session_id not in _completed_sessions:
-                send_final_callback(session_id, agent)
-                _completed_sessions.add(session_id)
+            all_keywords = set()
+            for text in scammer_texts:
+                all_keywords.update(agent.extractor.extract_suspicious_keywords(text))
+            suspicious_keywords = sorted(all_keywords)
+            
+            # Scam detected if any suspicious keywords found (latches via history)
+            scam_detected = len(suspicious_keywords) > 0
+            
+            # ── Callback: fire when turns >= 8 and new intel available ──
+            intel_count = (
+                len(artifacts.get("upi_ids", [])) +
+                len(artifacts.get("bank_accounts", [])) +
+                len(artifacts.get("phishing_links", [])) +
+                len(artifacts.get("phone_numbers", [])) +
+                len(suspicious_keywords)
+            )
+            has_intel = intel_count > 0
+            last_count = _session_last_intel.get(session_id, 0)
+            
+            if has_intel and turns >= 8 and intel_count > last_count:
+                send_final_callback(session_id, agent, scam_detected, suspicious_keywords)
+                _session_last_intel[session_id] = intel_count
             
             # Return clean GUVI-compliant response
             return jsonify({
@@ -258,8 +276,8 @@ if FLASK_AVAILABLE:
             data = request.get_json() or {}
             session_id = data.get("sessionId", data.get("session_id", "default"))
             
-            # Clear from completed sessions to allow new callback
-            _completed_sessions.discard(session_id)
+            # Clear callback tracking to allow new callback
+            _session_last_intel.pop(session_id, None)
             
             return jsonify({"status": "success"})
                 
@@ -275,7 +293,7 @@ if FLASK_AVAILABLE:
         
         return jsonify({
             "status": "success",
-            "completed_callbacks": len(_completed_sessions)
+            "completed_callbacks": len(_session_last_intel)
         })
 
 
