@@ -32,3 +32,4 @@ python-dotenv>=0.20.0              # For environment variable management
 # For HTTP API server:
 #   pip install flask
 # =======================================
+gunicorn>=20.0.0              # Production WSGI server for Flask (optional)
