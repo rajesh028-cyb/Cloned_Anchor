@@ -48,6 +48,8 @@ class ConversationContext:
     # Deterministic counters (replace random)
     template_index: Dict[str, int] = field(default_factory=dict)
     default_rotation_index: int = 0
+    # Session-level count of turns that contained a transaction verb
+    transaction_verb_count: int = 0
 
 
 class DeterministicStateMachine:
@@ -110,7 +112,7 @@ class DeterministicStateMachine:
         }
         
         # Transaction verbs — explicit action words that signal high scammer intent
-        self._transaction_verbs = {"send", "transfer", "pay"}
+        self._transaction_verbs = {"send", "transfer", "pay", "deposit"}
         
         # Jailbreak attempt counter
         self.jailbreak_attempts = 0
@@ -147,6 +149,15 @@ class DeterministicStateMachine:
         turn_score = self.scorer.score_turn(transcript)
         
         text_lower = transcript.lower()
+        
+        # Track session-level transaction verb occurrences BEFORE
+        # state determination so _determine_state can read the prior count.
+        # The count reflects how many *previous* turns contained a
+        # transaction verb — the current turn's verb is detected in
+        # _analyze_transcript and checked separately in Rule 3.5.
+        words = set(text_lower.split())
+        if words & self._transaction_verbs:
+            self.context.transaction_verb_count += 1
         
         # ═══════════════════════════════════════════════════════════════════
         # STEP 0: CHECK JAILBREAK PATTERNS (HIGHEST PRIORITY!)
@@ -269,7 +280,7 @@ class DeterministicStateMachine:
         1. Info request -> DEFLECT
         2. BehaviorScorer force-extract -> EXTRACT
         3. High threat -> STALL
-        3.5. Transaction verb + last_state==CLARIFY + past turn 1 -> CONFUSE
+        3.5. Transaction verb + prior transaction verb in session + turn>=2 -> CONFUSE
         4. Money mention -> CLARIFY/CONFUSE
         5. BehaviorScorer prefer-extract -> EXTRACT
         6. Question -> EXTRACT
@@ -288,21 +299,31 @@ class DeterministicStateMachine:
             return AgentState.STALL
         
         # ───────────────────────────────────────────────────────────────
-        # Rule 3.5: EARLY ESCALATION on transaction verbs
-        # Rationale: Scammers who use explicit transaction verbs
-        # (send / transfer / pay) signal high intent to extract money.
-        # If the agent is still sitting in CLARIFY after the first turn,
-        # we escalate immediately to CONFUSE to disrupt the scam flow —
-        # without waiting for the aggregate behavior score to cross its
-        # normal thresholds.  This is safe because:
-        #   - last_state == CLARIFY guarantees we are past turn 1
-        #     (last_state is None on the very first turn)
-        #   - analyze_and_transition is only called for scammer messages
-        #   - The rule is deterministic: same input always yields CONFUSE
+        # Rule 3.5: EARLY ESCALATION on repeated transaction verbs
+        #
+        # WHY THIS RULE EXISTS:
+        # A single transaction verb ("send", "transfer", "pay", "deposit")
+        # could be exploratory.  But when a scammer uses a transaction
+        # verb for the SECOND (or later) time in the same session, it
+        # signals persistent intent to move money.  We escalate from
+        # CLARIFY → CONFUSE immediately to disrupt the scam flow,
+        # without waiting for the aggregate behavior score to reach
+        # its normal thresholds.
+        #
+        # CONDITIONS (all must be true):
+        #   1. Current message contains a transaction verb
+        #   2. At least one PRIOR turn already contained a transaction
+        #      verb (transaction_verb_count >= 2 because the counter
+        #      is incremented for the current turn BEFORE we get here)
+        #   3. We are on turn >= 2 (len(turns) > 1)
+        #   4. last_state is CLARIFY — we only escalate OUT of CLARIFY
+        #
+        # DETERMINISM: same inputs always yield CONFUSE; no randomness.
         # ───────────────────────────────────────────────────────────────
         if (analysis.get("transaction_verb")
-                and self.context.last_state == AgentState.CLARIFY
-                and len(self.context.turns) > 1):
+                and self.context.transaction_verb_count >= 2
+                and len(self.context.turns) > 1
+                and self.context.last_state == AgentState.CLARIFY):
             return AgentState.CONFUSE
         
         # Rule 4: Money -> alternate CLARIFY/CONFUSE
