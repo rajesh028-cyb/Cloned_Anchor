@@ -56,45 +56,36 @@ from anchor_agent import AnchorAgent, create_agent
 from extractor import create_extractor
 from osint_enricher import get_enricher as get_osint_enricher
 from image_parser import extract_text_from_image
+from observer_server import observer_bp, init_observer_db, store_event
 from dotenv import load_dotenv
 load_dotenv()
 
 # ── SAFE MODE ────────────────────────────────────────────────────────────
 SAFE_MODE = os.getenv("ANCHOR_SAFE_MODE", "0") == "1"
 
-# ── OBSERVER (passive, fire-and-forget) ──────────────────────────────────
-# External observer service URL. Observer writes are dispatched in a daemon
-# thread so they NEVER block the /process response path. Any failure is
-# silently swallowed — the observer is a read-only forensic mirror, not a
-# dependency.
-OBSERVER_URL = os.getenv("OBSERVER_URL", "")  # e.g. http://localhost:9090
+# ── OBSERVER (passive, fire-and-forget, in-process) ─────────────────────
+# Writes go directly to SQLite via store_event() — no HTTP round-trip.
+# A daemon thread is used so the INSERT never blocks /process.
+# Any failure is silently swallowed.
 
 
 def write_observer_event(session_id: str, payload: dict) -> None:
     """
-    Fire-and-forget POST to the observer service.
+    Fire-and-forget write to SQLite via observer_server.store_event().
     Runs in a daemon thread so it can never block /process.
     Silently swallows all exceptions — observer is non-critical.
-    Skipped entirely when SAFE_MODE is active or OBSERVER_URL is unset.
+    Skipped entirely when SAFE_MODE is active.
     """
-    # SAFE_MODE: no external writes of any kind
     if SAFE_MODE:
         return
-    if not OBSERVER_URL:
-        return
 
-    def _post():
+    def _store():
         try:
-            requests.post(
-                f"{OBSERVER_URL}/observe",
-                json=payload,
-                timeout=0.5,  # hard cap — observer must be fast
-            )
+            store_event(payload)
         except Exception:
             pass  # observer failure is NEVER visible to Anchor
 
-    # Daemon thread: dies with the process, never blocks /process
-    threading.Thread(target=_post, daemon=True).start()
+    threading.Thread(target=_store, daemon=True).start()
 
 # ── SURVIVAL RESPONSES (deterministic, in-character, never silent) ──────
 SURVIVAL_RESPONSES = [
@@ -229,6 +220,10 @@ def require_api_key():
 
 if FLASK_AVAILABLE:
     app = Flask(__name__)
+
+    # ── Mount observer blueprint (public-read, no API key) ──────────────
+    app.register_blueprint(observer_bp, url_prefix="/observer")
+    init_observer_db()
     
     # Suppress all Flask logging for clean output
     log = logging.getLogger('werkzeug')
