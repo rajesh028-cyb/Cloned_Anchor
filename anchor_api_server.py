@@ -43,6 +43,7 @@ import logging
 import os
 import time
 import threading
+import uuid
 import requests
 
 try:
@@ -62,6 +63,32 @@ load_dotenv()
 
 # ── SAFE MODE ────────────────────────────────────────────────────────────
 SAFE_MODE = os.getenv("ANCHOR_SAFE_MODE", "0") == "1"
+
+# ── SESSION REGISTRY ─────────────────────────────────────────────────────
+# In-memory map: client_id → {"session_id": str, "last_seen": float}
+# Backend is the SINGLE source of truth for session identity.
+# Same client within 15 min → same session. After 15 min gap → new session.
+SESSION_TIMEOUT = int(os.getenv("ANCHOR_SESSION_TIMEOUT", "900"))  # seconds
+_session_registry: dict[str, dict] = {}
+_registry_lock = threading.Lock()
+
+
+def resolve_session(client_id: str) -> str:
+    """
+    Return the active session_id for client_id.
+    Creates a new session if the client is unknown or timed out (>15 min).
+    Thread-safe.
+    """
+    now = time.time()
+    with _registry_lock:
+        entry = _session_registry.get(client_id)
+        if entry and (now - entry["last_seen"]) <= SESSION_TIMEOUT:
+            entry["last_seen"] = now
+            return entry["session_id"]
+        # New or timed-out client → fresh session
+        new_session = str(uuid.uuid4())
+        _session_registry[client_id] = {"session_id": new_session, "last_seen": now}
+        return new_session
 
 # ── OBSERVER (passive, fire-and-forget, in-process) ─────────────────────
 # Writes go directly to SQLite via store_event() — no HTTP round-trip.
@@ -258,8 +285,16 @@ if FLASK_AVAILABLE:
             if not data:
                 return jsonify({"status": "success", "reply": get_survival_reply()}), 200
             
-            # Extract fields from GUVI format
-            session_id = data.get("sessionId", "default")
+            # ── Resolve client identity ──────────────────────────────────
+            # Priority: X-Client-ID header → anchor_client_id cookie → new uuid4
+            client_id = (
+                request.headers.get("X-Client-ID")
+                or request.cookies.get("anchor_client_id")
+                or str(uuid.uuid4())
+            )
+            
+            # ── Server-side session resolution (ignore frontend sessionId) ──
+            session_id = resolve_session(client_id)
             conversation_history = data.get("conversationHistory", [])
             
             # Extract current message
@@ -406,7 +441,16 @@ if FLASK_AVAILABLE:
                 pass  # observer must never interfere with /process
 
             # Return FULL intelligence response (GUVI reply + forensic data)
-            return jsonify(response_json)
+            resp = jsonify(response_json)
+            # ── Persist client identity via secure cookie ────────────────
+            resp.set_cookie(
+                "anchor_client_id",
+                client_id,
+                max_age=60 * 60 * 24 * 30,  # 30 days
+                httponly=True,
+                samesite="Lax",
+            )
+            return resp
             
         except Exception:
             # SURVIVAL: Never silent – always in-character
