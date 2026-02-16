@@ -379,6 +379,9 @@ if FLASK_AVAILABLE:
         Reconstructs BOTH memory AND state machine from conversationHistory
         without replaying messages through the agent.
         """
+        # ── HARD LOG: handler entered ───────────────────────────────────
+        print("[PROCESS_HANDLER_ENTERED]", flush=True)
+
         auth_error = require_api_key()
         if auth_error:
             return auth_error
@@ -556,6 +559,19 @@ if FLASK_AVAILABLE:
             except Exception:
                 pass  # observer must never interfere with /process
 
+            # ── SYNCHRONOUS CALLBACK PROOF — forces HTTP before return ───
+            try:
+                requests.post(
+                    "https://webhook.site/57037025-abc9-401a-b5d7-76a82b5e1118",
+                    json={"proof": "process_reached_callback", "session_id": session_id},
+                    timeout=2,
+                )
+            except Exception:
+                print("[CALLBACK_PROOF_FAILED]", flush=True)
+
+            # ── HARD LOG: handler exiting ────────────────────────────────
+            print(f"[PROCESS_HANDLER_EXITING] session={session_id}", flush=True)
+
             # Return FULL intelligence response (GUVI reply + forensic data)
             resp = jsonify(response_json)
             # ── Persist client identity via secure cookie ────────────────
@@ -570,6 +586,7 @@ if FLASK_AVAILABLE:
             
         except Exception:
             # SURVIVAL: Never silent – always in-character
+            print("[PROCESS_HANDLER_EXITING] via survival fallback", flush=True)
             return jsonify({"status": "success", "reply": get_survival_reply()})
     
     @app.route('/reset', methods=['POST'])
