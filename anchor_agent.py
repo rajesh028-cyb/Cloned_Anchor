@@ -175,12 +175,17 @@ class AnchorAgent:
         # ═══════════════════════════════════════════════════════════════════
         template, fills = self.state_machine.get_template_for_state(state, analysis)
         
-        # LLM only fills template blanks - NEVER sees scammer message
-        response = self.llm.generate_response(
+        # Build conversation history for Ollama context
+        conversation_history = self.memory.get_conversation_log() if hasattr(self.memory, 'get_conversation_log') else []
+        
+        # PRIMARY: Ollama LLM with template fallback
+        response = self.llm.get_response(
             state=state,
             template=template,
             fills=fills,
-            context="",  # No raw context - security isolation
+            conversation_history=conversation_history,
+            latest_scammer_message=scammer_message,
+            session_id=self.memory.session_id or "default",
         )
         
         # ═══════════════════════════════════════════════════════════════════

@@ -220,7 +220,7 @@ class ArtifactExtractor:
         
         # UPI patterns (Indian payment system)
         self._upi_patterns = [
-            re.compile(r'\b([a-zA-Z0-9._-]+@[a-zA-Z]{2,})\b'),  # user@bank (broad)
+            re.compile(r'\b([a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64})\b'),  # user@bank (broad, robust)
             re.compile(r'\b([a-zA-Z0-9._-]+@(?:paytm|gpay|phonepe|ybl|okaxis|oksbi|okhdfcbank|axl|ibl|upi|apl|fbl|boi|kotak|sbi|icici|hdfcbank|airtel|jio|postbank|unionbank|pnb|bob|canara|idbi|rbl|indus|federal|jupiter|kbl|freecharge|mobikwik|slice|cred|amazonpay|abfspay|waicici|wahdfcbank|wasbi|waaxis))\b', re.IGNORECASE),
         ]
 
@@ -233,7 +233,7 @@ class ArtifactExtractor:
         
         # Bank account patterns
         self._bank_patterns = {
-            'account_number': re.compile(r'\b(\d{9,18})\b'),  # 9-18 digit account numbers
+            'account_number': re.compile(r'\b(\d{10,18})\b'),  # 10-18 digit account numbers
             'ifsc': re.compile(r'\b([A-Z]{4}0[A-Z0-9]{6})\b'),  # Indian IFSC
             'swift': re.compile(r'\b([A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b'),  # SWIFT/BIC
             'routing': re.compile(r'\brouting[:\s#]*(\d{9})\b', re.IGNORECASE),  # US routing
@@ -249,7 +249,7 @@ class ArtifactExtractor:
         
         # Phone number patterns (international)
         self._phone_patterns = [
-            re.compile(r'\b(\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})\b'),  # US/Canada
+            re.compile(r'(?:\+?\d{1,3}[\-\s]?)?(?:\(?\d{3}\)?[\-\s]?)?\d{3,4}[\-\s]?\d{4}'),  # Broad intl
             re.compile(r'(?<!\w)(\+91[-.\s]?\d{10})(?!\d)'),  # India +91 (fixed: \b fails before +)
             re.compile(r'(?<!\w)(\+\d{1,3}[-.\s]?\d{6,14})(?!\d)'),  # International (fixed)
             re.compile(r'\b(\d{10})\b'),  # 10-digit (contextual)

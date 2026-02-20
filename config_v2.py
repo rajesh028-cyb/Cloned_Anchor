@@ -110,8 +110,8 @@ BLOCKED_PATTERNS = [
 # These patterns ALWAYS trigger EXTRACT, LLM cannot override
 # =============================================================================
 EXTRACT_FORCE_PATTERNS = [
-    # UPI patterns (Indian payment)
-    r'\b[a-zA-Z0-9._-]+@[a-zA-Z]{3,}\b',  # UPI ID format
+    # UPI patterns (Indian payment) — strict suffix match
+    r'\b[a-zA-Z0-9._-]+@(ybl|paytm|okhdfcbank|okaxis|upi|axl|ibl|oksbi)\b',
     r'\bUPI\b',
     r'\bpaytm\b',
     r'\bphonepe\b',
@@ -126,12 +126,9 @@ EXTRACT_FORCE_PATTERNS = [
     r'\brouting\s*number\b',
     r'\bwire\s*transfer\b',
     
-    # URL patterns
+    # URL patterns (full URLs only, no standalone TLDs)
     r'https?://[^\s]+',
-    r'\bwww\.[^\s]+',
-    r'\.com\b',
-    r'\.in\b',
-    r'\.org\b',
+    r'\bwww\.[^\s]+\.[a-z]{2,}',
     
     # Crypto
     r'\bbitcoin\b',
@@ -275,6 +272,12 @@ TEMPLATE_FILLS = {
     "item": ["glasses", "notepad", "pen", "hearing aid", "phone book"],
     "action": ["turn off the stove", "check on something", "find my notepad", "sit down"],
     "random_thing": ["recipe for pie", "plumber", "TV repair person", "dentist"],
+    "bank_name": ["SBI", "HDFC", "ICICI", "PNB", "the bank"],
+    "amount": ["that amount", "the money", "the payment"],
+    "last_word": ["that", "the thing you said", "what you mentioned"],
+    "contact_method": ["link", "number", "email", "website"],
+    "account_type": ["savings", "pension", "fixed deposit"],
+    "urgency_keyword": ["urgent", "important", "emergency"],
 }
 
 # =============================================================================

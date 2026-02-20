@@ -70,3 +70,4 @@ config_local.py
 # Test outputs
 # =========================
 test_outputs/
+.pytest_cache/
