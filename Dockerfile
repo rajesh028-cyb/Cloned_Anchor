@@ -2,8 +2,10 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install curl
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Install required dependencies
+RUN apt-get update && \
+    apt-get install -y curl zstd && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install Ollama
 RUN curl -fsSL https://ollama.com/install.sh | sh
@@ -17,7 +19,7 @@ RUN ollama serve & \
 # Railway injects PORT dynamically
 ENV PORT=11434
 
-EXPOSE ${PORT}
+EXPOSE 11434
 
-# Start Ollama on Railway's dynamic PORT
-CMD ollama serve --port ${PORT}
+# Start Ollama using Railway dynamic port
+CMD ["sh", "-c", "ollama serve --port ${PORT}"]
